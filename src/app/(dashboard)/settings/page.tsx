@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Loader2, User as UserIcon, Users, BookOpen, Megaphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ENTITIES, getEntityForCampaign, type Entity } from '@/lib/entity'
+import { getCampaignOverrides, saveCampaignOverride } from '@/app/actions/campaign-overrides'
 
 interface DBUser {
   id: string
@@ -78,14 +79,10 @@ export default function SettingsPage() {
 
     const [leadsRes, overridesRes] = await Promise.all([
       supabase.from('leads').select('source_campaign').limit(5000),
-      supabase.from('campaign_entity_overrides').select('source_campaign, entity'),
+      getCampaignOverrides().catch(() => []),
     ])
 
-    const overrideMap = new Map<string, Entity>(
-      ((overridesRes.data || []) as { source_campaign: string; entity: string }[]).map(
-        (o) => [o.source_campaign, o.entity as Entity]
-      )
-    )
+    const overrideMap = new Map<string, Entity>(overridesRes.map((o) => [o.source_campaign, o.entity]))
     const counts = new Map<string, number>()
     for (const l of (leadsRes.data || []) as { source_campaign: string }[]) {
       counts.set(l.source_campaign, (counts.get(l.source_campaign) || 0) + 1)
@@ -105,10 +102,8 @@ export default function SettingsPage() {
 
   const handleSetCampaignEntity = async (sourceCampaign: string, entity: Entity) => {
     setCampaignSaving(sourceCampaign)
-    const { error } = await supabase
-      .from('campaign_entity_overrides')
-      .upsert({ source_campaign: sourceCampaign, entity, updated_by: currentUser?.id || null })
-    if (!error) {
+    const result = await saveCampaignOverride(sourceCampaign, entity)
+    if (result.ok) {
       setCampaignsList((prev) =>
         prev.map((c) => (c.source_campaign === sourceCampaign ? { ...c, entity, isOverride: true } : c))
       )

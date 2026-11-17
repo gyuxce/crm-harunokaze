@@ -26,7 +26,8 @@ import { readPrdTrialSinceClient, PRD_TRIAL_MODE_CHANGED } from '@/lib/prd-trial
 import { resolveEntity, ENTITIES, type Entity } from '@/lib/entity'
 import { countLeadFunnel } from '@/lib/lead-funnel-counts'
 import { PAYMENT_CHANNEL_OPTIONS, paymentChannelLabel, type PaymentChannel } from '@/lib/payment-channel'
-import type { LeadRow, PaymentRow, CampaignEntityOverrideRow } from '@/lib/supabase/types'
+import { getCampaignOverrides } from '@/app/actions/campaign-overrides'
+import type { LeadRow, PaymentRow } from '@/lib/supabase/types'
 
 type LeadSummary = Pick<LeadRow, 'id' | 'full_name' | 'current_status' | 'updated_at' | 'lead_entry_date' | 'last_contacted_date' | 'source_campaign'>
 
@@ -70,14 +71,10 @@ export default function DashboardPage() {
         .select('lead_id, payment_type, amount, payment_method')
         .eq('verification_status', 'verified')
         .limit(5000),
-      supabase.from('campaign_entity_overrides').select('source_campaign, entity'),
+      getCampaignOverrides().catch(() => []),
     ])
 
-    const overrides = new Map<string, Entity>(
-      ((overridesRes.data || []) as Pick<CampaignEntityOverrideRow, 'source_campaign' | 'entity'>[]).map(
-        (o) => [o.source_campaign, o.entity as Entity]
-      )
-    )
+    const overrides = new Map<string, Entity>(overridesRes.map((o) => [o.source_campaign, o.entity]))
     setCampaignOverrides(overrides)
 
     const leadRows = (leadsRes.data || []) as LeadSummary[]
