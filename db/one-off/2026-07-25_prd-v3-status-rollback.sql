@@ -1,5 +1,5 @@
 -- PRD V3 rollback: restore legacy current_status from backup column.
--- Only works if supabase-prd-v3-status-normalize.sql was run.
+-- Only works if 2026-07-25_prd-v3-status-normalize.sql was run.
 -- Does NOT delete the lead_activities rows written by the migration
 -- (they are harmless history); drop them manually if desired.
 

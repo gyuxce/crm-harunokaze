@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CRM Harunokaze
 
-## Getting Started
+Dashboard CRM untuk tim CRO (HNZ × Wiwitan, juga lead KFI/Driver Jepang): mengelola lead dari masuk
+sampai closing seat-lock, pembayaran, pengajuan Danacita, dan laporan bulanan untuk partner.
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router, Turbopack), React 19, Tailwind CSS 4, Supabase (Auth + Postgres),
+TanStack Query, Recharts, dnd-kit.
+
+> Next.js di project ini versi baru dengan perubahan API dibanding yang umum dikenal. Baca panduan di
+> `node_modules/next/dist/docs/` sebelum menulis kode Next (lihat `AGENTS.md`).
+
+## Menjalankan di lokal
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+cp .env.example .env.local   # isi dua variabel Supabase (lihat bawah)
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Perintah | Fungsi |
+|---|---|
+| `npm run dev` | Server pengembangan |
+| `npm run build` / `npm start` | Build dan jalankan produksi |
+| `npm run lint` | ESLint |
+| `npm test` | Unit test logika murni (Vitest) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Variabel lingkungan
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variabel | Isi |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | URL project Supabase, mis. `https://<ref>.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable / anon key (Project Settings → API Keys). **Jangan** pakai secret / service_role key. |
 
-## Learn More
+> `npm run dev` dengan env di atas terhubung ke database yang diisi di env itu. Kalau itu produksi,
+> jangan simpan atau ubah data saat mencoba.
 
-To learn more about Next.js, take a look at the following resources:
+## Struktur
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/app/(dashboard)/   Halaman: dashboard, leads, stage-1/2/3, danacita, payments, laporan-bulanan, settings, ...
+src/app/actions/       Server actions
+src/components/        Komponen per fitur (leads, stage3, reports, layout, ...)
+src/lib/               Logika bersama
+  prd-stages.ts          Status dan alur Stage 1–3 (sumber kebenaran status)
+  entity.ts              Label HNZ / KFI dari campaign
+  last-touch.ts          Tracker "terakhir disentuh" (D+3)
+  lead-funnel-counts.ts  Hitungan funnel
+  supabase/              Client Supabase dan tipe
+db/                    SQL: baseline skema, riwayat, skrip sekali jalan (baca db/README.md)
+docs/superpowers/      Catatan desain dan rencana
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database
 
-## Deploy on Vercel
+Lihat [db/README.md](db/README.md). Ringkasnya: skema produksi ada di `db/baseline/`, file di
+`db/schema/` hanya riwayat (dan `001` menghapus data), paket gratis Supabase tidak punya backup otomatis.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Alur lead
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Stage 1 (lead masuk, bridging, pitching) → Stage 2 (interested, menunggu arahan) → Stage 3 (kanban:
+jadwal pemetaan → hasil pemetaan → pembayaran seat-lock → Closing Seat Lock; jalur keluar: Jalur Akselerasi,
+Cold Leads, Failed). Definisi status ada di `src/lib/prd-stages.ts`.
+
+Entitas (HNZ / KFI) ditentukan dari campaign: pengaturan di Settings → Campaign
+(`campaign_entity_overrides`), dan bila belum diatur, ditebak dari kata "driver" pada nama campaign.

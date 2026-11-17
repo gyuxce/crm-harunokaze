@@ -3,8 +3,8 @@
 -- to lead_activities. Reversible via the rollback block at the bottom.
 --
 -- Run order:
---   1) supabase-prd-v3-status-normalize.sql   (this file)
---   2) (optional) supabase-prd-v3-status-rollback.sql  (if you need to revert)
+--   1) 2026-07-25_prd-v3-status-normalize.sql   (this file)
+--   2) (optional) 2026-07-25_prd-v3-status-rollback.sql  (if you need to revert)
 
 -- 1. Backup column (add if missing) -----------------------------------------------
 alter table leads

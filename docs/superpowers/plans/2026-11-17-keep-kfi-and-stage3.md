@@ -11,7 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-11-17-keep-kfi-and-stage3-design.md`
 
 > **Catatan hasil akhir (2026-11-17):** plan ini sudah dijalankan. File yang dihasilkan bukan satu
-> `supabase-prd-v3-keep-kfi-and-stage3.sql` melainkan folder `supabase-cleanup/` (file 0–3), dengan
+> `supabase-prd-v3-keep-kfi-and-stage3.sql` melainkan folder `db/one-off/2026-11-17_cleanup-kfi-stage3/` (file 0–3), dengan
 > tambahan tabel `danacita_applications` dan angka konfirmasi `confirmed_delete`. Lihat spec untuk alasannya.
 
 ## Global Constraints

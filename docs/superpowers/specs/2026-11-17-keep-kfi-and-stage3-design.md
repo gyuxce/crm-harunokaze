@@ -3,7 +3,7 @@
 Status: disetujui user (2026-11-17). Ukuran: perubahan kecil (satu file SQL).
 
 Catatan hasil akhir: dijalankan 2026-11-17 (2135 -> 361 lead). Implementasi akhirnya dipecah menjadi
-file terpisah di `supabase-cleanup/` (0-campaign-check, 0b, 0c, 1-dry-run, 2-backup, 3-delete) dan
+file terpisah di `db/one-off/2026-11-17_cleanup-kfi-stage3/` (0-campaign-check, 0b, 0c, 1-dry-run, 2-backup, 3-delete) dan
 bukan satu file `supabase-prd-v3-keep-kfi-and-stage3.sql` seperti ditulis di bawah. Bagian 3 dibuat
 sebagai satu pernyataan `do $$` (tanpa temp table / begin-commit) karena editor SQL Supabase
 tidak mempertahankan temp table antar pernyataan.
