@@ -370,7 +370,6 @@ type DetailForm = {
   manualNote: string
   lastTouchedDate: string
   pemetaanNominal: string
-  hasilExpert: string
   expertName: string
   expertDiscussion: string
   expertRecommendation: string
@@ -401,7 +400,6 @@ function Stage3DetailModal({
     manualNote: cleanNotePreview(lead.funnel_notes) || cleanNotePreview(lead.notes),
     lastTouchedDate: toDateTimeInputValue(lead.last_contacted_date || lead.updated_at || lead.lead_entry_date),
     pemetaanNominal: pemetaanPayment ? String(Number(pemetaanPayment.amount || 0)) : '',
-    hasilExpert: '',
     expertName: lead.expert_consultations?.[0]?.expert_name || '',
     expertDiscussion: lead.expert_consultations?.[0]?.consultation_result || '',
     expertRecommendation: lead.expert_consultations?.[0]?.recommendation || '',
@@ -463,7 +461,6 @@ function Stage3DetailModal({
     if (!insertErr && data) setDanacitaApp(data as { id: string; status: DanacitaStatus })
   }
 
-  const showHasilExpert = form.status === 'Menunggu jadwal expert consultation'
   const showClosing = form.status === 'Closing Seat Lock'
   const showCold = form.status === 'Cold Leads'
   const showFailed = form.status === 'Failed'
@@ -520,7 +517,6 @@ function Stage3DetailModal({
 
     const funnelParts: string[] = []
     if (form.manualNote.trim()) funnelParts.push(`Catatan Stage 3: ${form.manualNote.trim()}`)
-    if (showHasilExpert && form.hasilExpert.trim()) funnelParts.push(`Hasil Expert: ${form.hasilExpert.trim()}`)
     if (form.expertDiscussion.trim()) funnelParts.push(`Diskusi CRO-Expert: ${form.expertDiscussion.trim()}`)
     if (form.expertRecommendation.trim()) funnelParts.push(`Rekomendasi Expert: ${form.expertRecommendation.trim()}`)
     if (form.croFollowUp.trim()) funnelParts.push(`Tindak lanjut CRO: ${form.croFollowUp.trim()}`)
@@ -739,13 +735,7 @@ function Stage3DetailModal({
                   </div>
                 </div>
 
-                {showHasilExpert && (
-                  <Field label="Hasil Expert (manual)">
-                    <textarea value={form.hasilExpert} onChange={(e) => setForm((p) => ({ ...p, hasilExpert: e.target.value }))} className="field-input min-h-[56px] resize-y" placeholder="Tulis hasil expert..." />
-                  </Field>
-                )}
-
-                {(form.status === 'Menunggu jadwal expert consultation' || form.expertName || form.expertDiscussion || form.expertRecommendation) && (
+                {(form.expertName || form.expertDiscussion || form.expertRecommendation) && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
                     <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">Log interaksi CRO & expert</p>
                     <div className="grid gap-3">

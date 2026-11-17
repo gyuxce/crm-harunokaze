@@ -27,7 +27,14 @@ import {
   fetchLeadsListingClient,
 } from '@/lib/leads-list-refresh'
 import { readPrdTrialSinceClient } from '@/lib/prd-trial-mode'
-import { STAGE1_LEGACY_NEW_LEAD, resolvePrdLane } from '@/lib/prd-stages'
+import { STAGE1_LEGACY_NEW_LEAD, resolvePrdLane, type PrdLane } from '@/lib/prd-stages'
+import {
+  daysSinceTouch,
+  formatTouchAgo,
+  getLastTouch,
+  isStaleTouch,
+  isTrackedStatus,
+} from '@/lib/last-touch'
 import { ENTITIES, resolveEntity, type Entity } from '@/lib/entity'
 import { useCampaignOverrides } from '@/lib/use-campaign-overrides'
 import { EntityBadge } from './entity-badge'
@@ -49,6 +56,30 @@ function displayStatus(status: string) {
   return status === STAGE1_LEGACY_NEW_LEAD ? 'Input Manual' : status
 }
 
+type LaneFilter = 'all' | 'early' | 'stage1' | 'stage2' | 'stage3'
+const LANE_FILTER_OPTIONS: { value: LaneFilter; label: string }[] = [
+  { value: 'all', label: 'Semua tahap' },
+  { value: 'early', label: 'Stage 1 + 2' },
+  { value: 'stage1', label: 'Stage 1' },
+  { value: 'stage2', label: 'Stage 2' },
+  { value: 'stage3', label: 'Stage 3' },
+]
+
+function parseLaneParam(value: string | null): LaneFilter {
+  return LANE_FILTER_OPTIONS.some((o) => o.value === value) ? (value as LaneFilter) : 'all'
+}
+
+function laneMatches(lane: PrdLane, filter: LaneFilter): boolean {
+  if (filter === 'all') return true
+  if (filter === 'early') return lane === 'stage1' || lane === 'stage2'
+  return lane === filter
+}
+
+function lastTouchTime(lead: Parameters<typeof getLastTouch>[0]): number {
+  const t = new Date(getLastTouch(lead) || 0).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
 export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -56,9 +87,16 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all')
   const [filterEntity, setFilterEntity] = useState<'all' | Entity>('all')
+  const [filterCampaign, setFilterCampaign] = useState('all')
+  const [excludeCampaign, setExcludeCampaign] = useState(false)
+  const [filterLane, setFilterLane] = useState<LaneFilter>(parseLaneParam(searchParams.get('lane')))
+  const [onlyTracked, setOnlyTracked] = useState(searchParams.get('track') === '1')
+  const [onlyStale, setOnlyStale] = useState(searchParams.get('stale') === '1')
   const campaignOverrides = useCampaignOverrides()
-  const [sortField, setSortField] = useState<'full_name' | 'lead_entry_date' | 'current_status'>('lead_entry_date')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [sortField, setSortField] = useState<'full_name' | 'lead_entry_date' | 'current_status' | 'last_touch'>(
+    searchParams.get('stale') === '1' ? 'last_touch' : 'lead_entry_date'
+  )
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(searchParams.get('stale') === '1' ? 'asc' : 'desc')
   const [csvModalOpen, setCsvModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [leadToDelete, setLeadToDelete] = useState<{ id: string; name: string } | null>(null)
@@ -81,6 +119,15 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
   useEffect(() => {
     const statusParam = searchParams.get('status')
     if (statusParam) setFilterStatus(statusParam)
+    // Deep-link dari dashboard: /leads?track=1&stale=1&lane=early
+    if (searchParams.get('track') === '1') setOnlyTracked(true)
+    if (searchParams.get('stale') === '1') {
+      setOnlyStale(true)
+      setSortField('last_touch')
+      setSortDir('asc')
+    }
+    const laneParam = searchParams.get('lane')
+    if (laneParam) setFilterLane(parseLaneParam(laneParam))
   }, [searchParams])
 
   const refreshLeadsFromServer = async (force = false) => {
@@ -110,6 +157,17 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
     return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [leads])
 
+  const campaignsList = useMemo(() => {
+    const counts = new Map<string, number>()
+    leads.forEach((l) => {
+      const name = l.source_campaign || ''
+      if (name) counts.set(name, (counts.get(name) || 0) + 1)
+    })
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [leads])
+
   const filtered = useMemo(() => {
     let data = [...leads]
 
@@ -131,7 +189,28 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
       data = data.filter((l) => resolveEntity(l.source_campaign, campaignOverrides) === filterEntity)
     }
 
+    if (filterCampaign !== 'all') {
+      data = data.filter((l) => ((l.source_campaign || '') === filterCampaign) !== excludeCampaign)
+    }
+
+    if (filterLane !== 'all') {
+      data = data.filter((l) => laneMatches(resolvePrdLane(l.current_status), filterLane))
+    }
+
+    // "Perlu dilacak" = bukan Closing/Akselerasi/Cold/Failed/Not Interested/Not Eligible.
+    // "Belum disentuh" (tracker D+3) selalu hanya untuk status yang perlu dilacak.
+    if (onlyTracked || onlyStale) {
+      data = data.filter((l) => isTrackedStatus(l.current_status))
+    }
+    if (onlyStale) {
+      data = data.filter((l) => isStaleTouch(daysSinceTouch(l)))
+    }
+
     data.sort((a, b) => {
+      if (sortField === 'last_touch') {
+        const diff = lastTouchTime(a) - lastTouchTime(b)
+        return sortDir === 'asc' ? diff : -diff
+      }
       const av =
         sortField === 'lead_entry_date'
           ? a.lead_entry_date
@@ -148,7 +227,41 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
     })
 
     return data
-  }, [leads, search, filterStatus, filterEntity, sortField, sortDir, campaignOverrides])
+  }, [
+    leads,
+    search,
+    filterStatus,
+    filterEntity,
+    filterCampaign,
+    excludeCampaign,
+    filterLane,
+    onlyTracked,
+    onlyStale,
+    sortField,
+    sortDir,
+    campaignOverrides,
+  ])
+
+  const hasActiveFilters =
+    filterStatus !== 'all' ||
+    filterEntity !== 'all' ||
+    filterCampaign !== 'all' ||
+    filterLane !== 'all' ||
+    onlyTracked ||
+    onlyStale ||
+    search !== ''
+
+  function resetFilters() {
+    setSearch('')
+    setFilterStatus('all')
+    setFilterEntity('all')
+    setFilterCampaign('all')
+    setExcludeCampaign(false)
+    setFilterLane('all')
+    setOnlyTracked(false)
+    setOnlyStale(false)
+    setCurrentPage(1)
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -255,7 +368,7 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
         </div>
       </div>
 
-      <div className="glass-card rounded-2xl border border-border p-3">
+      <div className="glass-card rounded-2xl border border-border p-3 space-y-2.5">
         <div className="relative max-w-md">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
           <input
@@ -267,6 +380,107 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
             placeholder="Cari nama, WhatsApp, campaign..."
             className="w-full pl-9 pr-3 py-2 rounded-xl text-xs text-foreground placeholder-muted-foreground bg-card border border-border outline-none focus:ring-1 focus:ring-primary focus:border-primary"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filterLane}
+            onChange={(e) => {
+              setFilterLane(e.target.value as LaneFilter)
+              setCurrentPage(1)
+            }}
+            className="rounded-lg border border-border bg-card px-2 py-1.5 text-[11px] font-medium text-foreground outline-none"
+            aria-label="Filter tahap"
+          >
+            {LANE_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterCampaign}
+            onChange={(e) => {
+              setFilterCampaign(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="max-w-[16rem] rounded-lg border border-border bg-card px-2 py-1.5 text-[11px] font-medium text-foreground outline-none"
+            aria-label="Filter campaign"
+          >
+            <option value="all">Semua campaign</option>
+            {campaignsList.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name} ({c.count})
+              </option>
+            ))}
+          </select>
+          <label
+            className={cn(
+              'flex items-center gap-1.5 text-[11px] text-muted-foreground',
+              filterCampaign === 'all' && 'opacity-40'
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={excludeCampaign}
+              disabled={filterCampaign === 'all'}
+              onChange={(e) => {
+                setExcludeCampaign(e.target.checked)
+                setCurrentPage(1)
+              }}
+            />
+            Kecualikan campaign ini
+          </label>
+
+          <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setOnlyTracked((v) => !v)
+              setCurrentPage(1)
+            }}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors',
+              onlyTracked
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+            )}
+            title="Sembunyikan Closing Seat Lock, Jalur Akselerasi, Cold Leads, Failed, Not Interested, Not Eligible"
+          >
+            Perlu dilacak
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !onlyStale
+              setOnlyStale(next)
+              if (next) {
+                // Yang paling lama tidak disentuh tampil paling atas.
+                setSortField('last_touch')
+                setSortDir('asc')
+              }
+              setCurrentPage(1)
+            }}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors',
+              onlyStale
+                ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+            )}
+            title="Hanya lead yang perlu dilacak dan belum disentuh lebih dari 3 hari"
+          >
+            Belum disentuh &gt; 3 hari
+          </button>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+            >
+              Reset filter
+            </button>
+          )}
         </div>
       </div>
 
@@ -331,6 +545,15 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
                   </div>
                 </th>
                 <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 cursor-pointer select-none text-left"
+                    onClick={() => toggleSort('last_touch')}
+                  >
+                    Terakhir disentuh {renderSortIcon('last_touch')}
+                  </button>
+                </th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
                   Aksi
                 </th>
                 <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
@@ -341,7 +564,7 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-16 text-center text-muted-foreground/40 text-sm">
+                  <td colSpan={6} className="px-4 py-16 text-center text-muted-foreground/40 text-sm">
                     Tidak ada data leads yang cocok.
                   </td>
                 </tr>
@@ -374,6 +597,24 @@ export function LeadsTable({ initialLeads, pics }: LeadsTableProps) {
                       >
                         {displayStatus(lead.current_status)}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {(() => {
+                        const days = daysSinceTouch(lead)
+                        const last = getLastTouch(lead)
+                        const stale = isStaleTouch(days) && isTrackedStatus(lead.current_status)
+                        return (
+                          <span
+                            className={cn(
+                              'text-[11px] tabular-nums',
+                              stale ? 'font-semibold text-amber-600' : 'text-muted-foreground'
+                            )}
+                            title={last ? new Date(last).toLocaleString('id-ID') : undefined}
+                          >
+                            {formatTouchAgo(days)}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">

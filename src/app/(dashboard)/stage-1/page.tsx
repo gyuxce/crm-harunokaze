@@ -23,6 +23,7 @@ import {
 } from '@/lib/prd-stages'
 import { readPrdTrialSinceClient, PRD_TRIAL_MODE_CHANGED } from '@/lib/prd-trial-mode'
 import { useCampaignOverrides } from '@/lib/use-campaign-overrides'
+import { daysSinceTouch, formatTouchAgo, isStaleTouch } from '@/lib/last-touch'
 import { EntityBadge } from '@/components/leads/entity-badge'
 
 type LeadRow = {
@@ -32,6 +33,8 @@ type LeadRow = {
   source_campaign: string
   current_status: string
   lead_entry_date: string
+  last_contacted_date?: string | null
+  updated_at?: string | null
   users?: { id?: string; name?: string } | null
 }
 
@@ -71,7 +74,7 @@ export default function Stage1Page() {
     const trialSince = readPrdTrialSinceClient()
     let q = supabase
       .from('leads')
-      .select('id, full_name, whatsapp_number, source_campaign, current_status, lead_entry_date, users:assigned_cro_id(id, name)')
+      .select('id, full_name, whatsapp_number, source_campaign, current_status, lead_entry_date, last_contacted_date, updated_at, users:assigned_cro_id(id, name)')
       .in('current_status', ['Input Manual', 'New Lead', 'Bridging', 'Pitching'])
       .order('lead_entry_date', { ascending: false })
       .limit(400)
@@ -278,9 +281,26 @@ export default function Stage1Page() {
                         <span className="min-w-0 truncate text-[10px] text-muted-foreground">{lead.source_campaign}</span>
                         <EntityBadge sourceCampaign={lead.source_campaign} overrides={campaignOverrides} />
                       </p>
-                      <span className={cn('mt-1 inline-block rounded px-1.5 py-0.5 text-[9px]', getStageBadgeClasses(lead.current_status))}>
-                        {lead.current_status}
-                      </span>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <span className={cn('inline-block rounded px-1.5 py-0.5 text-[9px]', getStageBadgeClasses(lead.current_status))}>
+                          {lead.current_status}
+                        </span>
+                        {(() => {
+                          const days = daysSinceTouch(lead)
+                          const stale = isStaleTouch(days)
+                          return (
+                            <span
+                              className={cn(
+                                'shrink-0 text-[10px] tabular-nums',
+                                stale ? 'font-semibold text-amber-600' : 'text-muted-foreground'
+                              )}
+                              title="Terakhir disentuh"
+                            >
+                              {formatTouchAgo(days)}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </button>
                   )
                 })

@@ -15,6 +15,7 @@ import {
 } from '@/lib/prd-stages'
 import { readPrdTrialSinceClient, PRD_TRIAL_MODE_CHANGED } from '@/lib/prd-trial-mode'
 import { useCampaignOverrides } from '@/lib/use-campaign-overrides'
+import { daysSinceTouch, formatTouchAgo, isStaleTouch } from '@/lib/last-touch'
 import { EntityBadge } from '@/components/leads/entity-badge'
 import {
   CheckCircle2,
@@ -32,6 +33,7 @@ type LeadRow = {
   current_status: string
   lead_entry_date: string
   last_contacted_date: string | null
+  updated_at?: string | null
   payments?: {
     id: string
     payment_type: string
@@ -100,7 +102,7 @@ export default function Stage2Page() {
     const trialSince = readPrdTrialSinceClient()
     let q = supabase
       .from('leads')
-      .select('id, full_name, whatsapp_number, source_campaign, current_status, lead_entry_date, last_contacted_date, payments(id, payment_type, amount, payment_method, payment_date, verification_status, notes), users:assigned_cro_id(id, name)')
+      .select('id, full_name, whatsapp_number, source_campaign, current_status, lead_entry_date, last_contacted_date, updated_at, payments(id, payment_type, amount, payment_method, payment_date, verification_status, notes), users:assigned_cro_id(id, name)')
       .in('current_status', STAGE2_VISIBLE_STATUSES as unknown as string[])
       .order('updated_at', { ascending: false })
       .limit(1000)
@@ -292,6 +294,7 @@ export default function Stage2Page() {
                   <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Nama</th>
                   <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Nomor WhatsApp</th>
                   <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Current Staging</th>
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Terakhir disentuh</th>
                   <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Edit</th>
                   <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Kerjakan Stage 2</th>
                 </tr>
@@ -299,13 +302,13 @@ export default function Stage2Page() {
               <tbody className="divide-y divide-border">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                       <Loader2 size={16} className="inline animate-spin" /> Memuat...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground/40 text-sm">
+                    <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground/40 text-sm">
                       Belum ada lead di Stage 2.
                     </td>
                   </tr>
@@ -326,6 +329,21 @@ export default function Stage2Page() {
                         <span className={cn('px-1.5 py-0.5 rounded-md text-[10px] font-semibold', getStageBadgeClasses(lead.current_status))}>
                           {lead.current_status}
                         </span>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {(() => {
+                          const days = daysSinceTouch(lead)
+                          return (
+                            <span
+                              className={cn(
+                                'text-[11px] tabular-nums',
+                                isStaleTouch(days) ? 'font-semibold text-amber-600' : 'text-muted-foreground'
+                              )}
+                            >
+                              {formatTouchAgo(days)}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <Link

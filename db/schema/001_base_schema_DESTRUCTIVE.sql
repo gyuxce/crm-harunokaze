@@ -1,3 +1,10 @@
+-- !!! PERINGATAN — FILE INI MENGHAPUS DATA !!!
+-- File ini DROP TABLE ... CASCADE untuk leads, users, payments, dan tabel lain, lalu membuatnya ulang
+-- kosong. JANGAN dijalankan di database yang berisi data (termasuk produksi).
+-- Ini riwayat pembuatan awal skema (2026-06-23). Skema produksi sekarang sudah berbeda;
+-- untuk database baru pakai db/baseline/. Lihat db/README.md.
+-- ============================================================
+
 -- ============================================================
 -- HARUNOKAZE CRO CRM - Database Restructure Migration
 -- Run this in Supabase SQL Editor

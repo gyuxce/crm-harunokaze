@@ -1,6 +1,6 @@
 -- Atomic save for Work Queue (Kerjaan Hari Ini).
 -- Run in Supabase SQL Editor before using the transactional save path.
--- Requires public.lead_interventions table (see supabase-lead-interventions.sql).
+-- Requires public.lead_interventions table (see 004_lead-interventions.sql).
 
 create or replace function public.save_work_queue_fast(
   p_lead_id uuid,

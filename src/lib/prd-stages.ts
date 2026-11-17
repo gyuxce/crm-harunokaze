@@ -80,7 +80,6 @@ export const STAGE2_VISIBLE_STATUSES = [
 export const STAGE2_UPDATE_STATUS_OPTIONS = [
   'Menunggu jadwal pemetaan',
   'Menunggu hasil pemetaan',
-  'Menunggu jadwal expert consultation',
   'Menunggu pembayaran seat-lock',
   'Menunggu arahan selanjutnya',
   'Lainnya (tulis di note)',
@@ -102,7 +101,6 @@ export const STAGE2_KERJAKAN_STATUS_OPTIONS = [
 export const STAGE3_STATUS_OPTIONS = [
   'Menunggu jadwal pemetaan',
   'Menunggu hasil pemetaan',
-  'Menunggu jadwal expert consultation',
   'Menunggu pembayaran seat-lock',
   'Jalur Akselerasi',
   'Closing Seat Lock',
@@ -127,15 +125,25 @@ export const STAGE3_EXIT_STATUSES = ['Cold Leads', 'Failed'] as const
 export const STAGE3_WON_STATUSES = ['Closing Seat Lock'] as const
 
 /**
- * Status Stage 3 yang perlu "butuh perhatian" kalau lama tidak disentuh.
+ * Status Stage 3 yang TIDAK perlu dilacak "last touch": sudah seat lock (Closing),
+ * sudah masuk Jalur Akselerasi, atau sudah keluar (Cold / Failed).
+ */
+export const STAGE3_ATTENTION_EXCLUDED_STATUSES = [
+  'Closing Seat Lock',
+  'Jalur Akselerasi',
+  'Cold Leads',
+  'Failed',
+] as const
+
+/**
+ * Status Stage 3 yang perlu "butuh perhatian" kalau lama tidak disentuh:
+ * semua status Stage 3 KECUALI STAGE3_ATTENTION_EXCLUDED_STATUSES.
  * Dipakai bareng oleh dashboard (widget) dan header (notifikasi bell) —
  * satu sumber supaya keduanya tidak diam-diam beda hitungan.
  */
-export const STAGE3_ATTENTION_STATUSES = [
-  'Menunggu hasil pemetaan',
-  'Menunggu jadwal expert consultation',
-  'Menunggu pembayaran seat-lock',
-] as const
+export const STAGE3_ATTENTION_STATUSES: string[] = STAGE3_STATUS_OPTIONS.filter(
+  (s) => !(STAGE3_ATTENTION_EXCLUDED_STATUSES as readonly string[]).includes(s)
+)
 
 /** Ambang hari "belum disentuh" sebelum dianggap butuh perhatian. */
 export const STAGE3_ATTENTION_STALE_DAYS = 3
@@ -155,13 +163,6 @@ export const STAGE3_BOARD_COLUMNS = [
     color: '#6366f1',
     soft: 'rgba(99,102,241,0.10)',
     statuses: ['Menunggu hasil pemetaan'] as string[],
-  },
-  {
-    key: 'expert',
-    label: 'Menunggu jadwal expert consultation',
-    color: '#10b981',
-    soft: 'rgba(16,185,129,0.10)',
-    statuses: ['Menunggu jadwal expert consultation'] as string[],
   },
   {
     key: 'seatlock',
