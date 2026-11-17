@@ -46,6 +46,7 @@ src/lib/               Logika bersama
   last-touch.ts          Tracker "terakhir disentuh" (D+3)
   lead-funnel-counts.ts  Hitungan funnel
   supabase/              Client Supabase dan tipe
+src/server/            Data laporan bulanan dan campaign melalui lapisan server dengan sesi pengguna
 db/                    SQL: baseline skema, riwayat, skrip sekali jalan (baca db/README.md)
 docs/superpowers/      Catatan desain dan rencana
 ```
