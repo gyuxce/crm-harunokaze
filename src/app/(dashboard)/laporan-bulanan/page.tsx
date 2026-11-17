@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Header } from '@/components/layout/header'
-import { createClient } from '@/lib/supabase/client'
+import { loadLaporanBulanan } from '@/app/actions/laporan-bulanan'
 import { cn } from '@/lib/utils'
 import { Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { ENTITIES, resolveEntity, type Entity } from '@/lib/entity'
@@ -110,7 +110,6 @@ function Delta({ current, previous, invertColor = false }: { current: number; pr
 }
 
 export default function LaporanBulananPage() {
-  const supabase = createClient()
   const campaignOverrides = useCampaignOverrides()
   const [loading, setLoading] = useState(true)
   const [leads, setLeads] = useState<LeadRow[]>([])
@@ -126,16 +125,17 @@ export default function LaporanBulananPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [leadsRes, paymentsRes, danacitaRes] = await Promise.all([
-      supabase.from('leads').select('id, current_status, source_campaign, lead_entry_date').limit(5000),
-      supabase.from('payments').select('lead_id, payment_type, amount, payment_date, verification_status').eq('verification_status', 'verified').limit(5000),
-      supabase.from('danacita_applications').select('id, status, created_at').limit(2000),
-    ])
-    setLeads((leadsRes.data || []) as LeadRow[])
-    setPayments((paymentsRes.data || []) as PaymentRow[])
-    setDanacitaApps((danacitaRes.data || []) as { id: string; status: DanacitaStatus; created_at: string }[])
-    setLoading(false)
-  }, [supabase])
+    try {
+      const data = await loadLaporanBulanan()
+      setLeads(data.leads as LeadRow[])
+      setPayments(data.payments as PaymentRow[])
+      setDanacitaApps(data.danacita as { id: string; status: DanacitaStatus; created_at: string }[])
+    } catch (error) {
+      console.error('Gagal memuat laporan bulanan:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     fetchAll()
