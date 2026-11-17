@@ -125,14 +125,25 @@ export const STAGE3_EXIT_STATUSES = ['Cold Leads', 'Failed'] as const
 export const STAGE3_WON_STATUSES = ['Closing Seat Lock'] as const
 
 /**
- * Status Stage 3 yang perlu "butuh perhatian" kalau lama tidak disentuh.
+ * Status Stage 3 yang TIDAK perlu dilacak "last touch": sudah seat lock (Closing),
+ * sudah masuk Jalur Akselerasi, atau sudah keluar (Cold / Failed).
+ */
+export const STAGE3_ATTENTION_EXCLUDED_STATUSES = [
+  'Closing Seat Lock',
+  'Jalur Akselerasi',
+  'Cold Leads',
+  'Failed',
+] as const
+
+/**
+ * Status Stage 3 yang perlu "butuh perhatian" kalau lama tidak disentuh:
+ * semua status Stage 3 KECUALI STAGE3_ATTENTION_EXCLUDED_STATUSES.
  * Dipakai bareng oleh dashboard (widget) dan header (notifikasi bell) —
  * satu sumber supaya keduanya tidak diam-diam beda hitungan.
  */
-export const STAGE3_ATTENTION_STATUSES = [
-  'Menunggu hasil pemetaan',
-  'Menunggu pembayaran seat-lock',
-] as const
+export const STAGE3_ATTENTION_STATUSES: string[] = STAGE3_STATUS_OPTIONS.filter(
+  (s) => !(STAGE3_ATTENTION_EXCLUDED_STATUSES as readonly string[]).includes(s)
+)
 
 /** Ambang hari "belum disentuh" sebelum dianggap butuh perhatian. */
 export const STAGE3_ATTENTION_STALE_DAYS = 3

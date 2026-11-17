@@ -19,8 +19,9 @@ import { getTodayInWIB } from '@/lib/utils'
 import {
   STAGE3_BOARD_COLUMNS,
   STAGE3_ATTENTION_STATUSES,
-  STAGE3_ATTENTION_STALE_DAYS,
+  resolvePrdLane,
 } from '@/lib/prd-stages'
+import { daysSinceTouch, isStaleTouch, isTrackedStatus } from '@/lib/last-touch'
 import { readPrdTrialSinceClient, PRD_TRIAL_MODE_CHANGED } from '@/lib/prd-trial-mode'
 import { resolveEntity, ENTITIES, type Entity } from '@/lib/entity'
 import { countLeadFunnel } from '@/lib/lead-funnel-counts'
@@ -45,6 +46,8 @@ export default function DashboardPage() {
     () => emptyByEntity(() => ({ map: 0, seat: 0, total: 0 }))
   )
   const [stalePreview, setStalePreview] = useState<StalePreview[]>([])
+  const [staleTotal, setStaleTotal] = useState(0)
+  const [earlyStaleTotal, setEarlyStaleTotal] = useState(0)
   const [paymentsByChannel, setPaymentsByChannel] = useState<Record<PaymentChannel, { count: number; amount: number }>>(
     () => Object.fromEntries(PAYMENT_CHANNEL_OPTIONS.map((o) => [o.value, { count: 0, amount: 0 }])) as Record<PaymentChannel, { count: number; amount: number }>
   )
@@ -119,17 +122,31 @@ export default function DashboardPage() {
     setPaymentsByChannel(byChannel)
 
     const now = Date.now()
-    const nextStale = leadRows
+    const allStale = leadRows
       .filter((l) => (STAGE3_ATTENTION_STATUSES as readonly string[]).includes(l.current_status))
-      .map((l) => {
-        const last = l.last_contacted_date || l.updated_at || l.lead_entry_date
-        const days = last ? Math.floor((now - new Date(last).getTime()) / 86400000) : 0
-        return { id: l.id, name: l.full_name, status: l.current_status, days }
-      })
-      .filter((row) => row.days > STAGE3_ATTENTION_STALE_DAYS)
+      .map((l) => ({
+        id: l.id,
+        name: l.full_name,
+        status: l.current_status,
+        days: daysSinceTouch(l, now) ?? 0,
+      }))
+      .filter((row) => isStaleTouch(row.days))
       .sort((a, b) => b.days - a.days)
-      .slice(0, 6)
-    setStalePreview(nextStale)
+    setStaleTotal(allStale.length)
+    setStalePreview(allStale.slice(0, 10))
+
+    // Stage 1–2 tidak ditampilkan per-lead di dashboard (bisa banyak); cukup hitungannya,
+    // detailnya difilter tim CRO di halaman Leads.
+    setEarlyStaleTotal(
+      leadRows.filter((l) => {
+        const lane = resolvePrdLane(l.current_status)
+        return (
+          (lane === 'stage1' || lane === 'stage2') &&
+          isTrackedStatus(l.current_status) &&
+          isStaleTouch(daysSinceTouch(l, now))
+        )
+      }).length
+    )
     setLoading(false)
   }, [supabase])
 
@@ -322,10 +339,33 @@ export default function DashboardPage() {
                     </li>
                   ))}
                 </ul>
+                {staleTotal > stalePreview.length && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {isId
+                      ? `+${staleTotal - stalePreview.length} lead lainnya belum ditampilkan. Buka Stage 3 untuk melihat semuanya.`
+                      : `+${staleTotal - stalePreview.length} more not shown. Open Stage 3 to see them all.`}
+                  </p>
+                )}
                 <Link href="/stage-3" className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:opacity-80">
                   {isId ? 'Buka Stage 3' : 'Open Stage 3'} <ArrowRight size={11} />
                 </Link>
               </>
+            )}
+            {!loading && earlyStaleTotal > 0 && (
+              <Link
+                href="/leads?track=1&stale=1&lane=early"
+                className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground transition-colors hover:bg-secondary/50"
+              >
+                <span>
+                  <b className="text-foreground">{earlyStaleTotal}</b>{' '}
+                  {isId
+                    ? 'lead Stage 1–2 belum disentuh lebih dari 3 hari'
+                    : 'Stage 1–2 leads untouched for more than 3 days'}
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-accent">
+                  {isId ? 'Lihat' : 'View'} <ArrowRight size={11} />
+                </span>
+              </Link>
             )}
           </section>
 
