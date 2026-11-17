@@ -80,7 +80,6 @@ export const STAGE2_VISIBLE_STATUSES = [
 export const STAGE2_UPDATE_STATUS_OPTIONS = [
   'Menunggu jadwal pemetaan',
   'Menunggu hasil pemetaan',
-  'Menunggu jadwal expert consultation',
   'Menunggu pembayaran seat-lock',
   'Menunggu arahan selanjutnya',
   'Lainnya (tulis di note)',
@@ -102,7 +101,6 @@ export const STAGE2_KERJAKAN_STATUS_OPTIONS = [
 export const STAGE3_STATUS_OPTIONS = [
   'Menunggu jadwal pemetaan',
   'Menunggu hasil pemetaan',
-  'Menunggu jadwal expert consultation',
   'Menunggu pembayaran seat-lock',
   'Jalur Akselerasi',
   'Closing Seat Lock',
@@ -133,7 +131,6 @@ export const STAGE3_WON_STATUSES = ['Closing Seat Lock'] as const
  */
 export const STAGE3_ATTENTION_STATUSES = [
   'Menunggu hasil pemetaan',
-  'Menunggu jadwal expert consultation',
   'Menunggu pembayaran seat-lock',
 ] as const
 
@@ -155,13 +152,6 @@ export const STAGE3_BOARD_COLUMNS = [
     color: '#6366f1',
     soft: 'rgba(99,102,241,0.10)',
     statuses: ['Menunggu hasil pemetaan'] as string[],
-  },
-  {
-    key: 'expert',
-    label: 'Menunggu jadwal expert consultation',
-    color: '#10b981',
-    soft: 'rgba(16,185,129,0.10)',
-    statuses: ['Menunggu jadwal expert consultation'] as string[],
   },
   {
     key: 'seatlock',

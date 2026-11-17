@@ -89,8 +89,6 @@ export const FUNNEL_STAGES = [
     statuses: [
       'Expert Consultation Scheduled',
       'Expert Consultation Done',
-      // PRD V3 (prd-stages.ts) — Stage 3 board, kolom expert:
-      'Menunggu jadwal expert consultation',
     ],
   },
   {
